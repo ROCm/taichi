@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.17)
 
 set(TESTS_NAME taichi_cpp_tests)
 if (WIN32)
@@ -17,6 +17,7 @@ file(GLOB_RECURSE TAICHI_TESTS_SOURCE
         "tests/cpp/common/*.cpp"
         "tests/cpp/ir/*.cpp"
         "tests/cpp/program/*.cpp"
+        "tests/cpp/rhi/common/*.cpp"
         "tests/cpp/struct/*.cpp"
         "tests/cpp/transforms/*.cpp"
         "tests/cpp/offline_cache/*.cpp")
