@@ -6,6 +6,18 @@ FROM ${BASE_IMAGE} as taichi_build
 
 ARG LLVM_VERSION=15
 ARG GPU_TARGETS=gfx90a,gfx942
+ARG PROJECT_NAME
+ARG RELEASE_VERSION
+ARG TI_VERSION_MAJOR
+ARG TI_VERSION_MINOR
+ARG TI_VERSION_PATCH
+
+ENV PROJECT_NAME=${PROJECT_NAME}
+ENV RELEASE_VERSION=${RELEASE_VERSION}
+ENV TI_VERSION_MAJOR=${TI_VERSION_MAJOR}
+ENV TI_VERSION_MINOR=${TI_VERSION_MINOR}
+ENV TI_VERSION_PATCH=${TI_VERSION_PATCH}
+
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV SRC_DIR=/src
@@ -22,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libwayland-dev libx11-xcb-dev libxcb-dri3-dev libxcb-ewmh-dev \
     libxcb-keysyms1-dev libxcb-randr0-dev libxcursor-dev libxi-dev \
     libxinerama-dev libxrandr-dev libzstd-dev \
-    python3-pip cmake ca-certificates \
+    python3-pip cmake pybind11-dev ca-certificates \
     llvm-${LLVM_VERSION} clang-${LLVM_VERSION} lld-${LLVM_VERSION} \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -34,7 +46,7 @@ RUN git config --global --add safe.directory "${TAICHI_SRC}"
 RUN cd ${TAICHI_SRC} && \
     ./build.py && \
     mkdir -p /tmp/artifacts && \
-    cp dist/taichi*.whl /tmp/artifacts/ && \
+    cp dist/amd_taichi*.whl /tmp/artifacts/ && \
     tar -czvf /tmp/artifacts/taichi-tests.tar.gz -C /src taichi
 
 # ---------------------------------------------
@@ -53,10 +65,10 @@ RUN apt-get update && apt-get install -y \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Taichi wheel
-COPY --from=taichi_build /tmp/artifacts/taichi*.whl /
+COPY --from=taichi_build /tmp/artifacts/amd_taichi*.whl /
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip3 install /taichi*.whl && \
-    rm /taichi*.whl
+    pip3 install /amd_taichi*.whl && \
+    rm /amd_taichi*.whl
 
 # ---------------------------------------------
 # Stage 3: Export raw artifacts to host
