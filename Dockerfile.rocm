@@ -1,0 +1,76 @@
+# ---------------------------------------------
+# Stage 1: Build Taichi and generate artifacts
+# ---------------------------------------------
+ARG BASE_IMAGE=rocm/dev-ubuntu-22.04:6.3.2
+FROM ${BASE_IMAGE} as taichi_build
+
+ARG LLVM_VERSION=15
+ARG GPU_TARGETS=gfx90a,gfx942
+ARG PROJECT_NAME
+ARG RELEASE_VERSION
+ARG TI_VERSION_MAJOR
+ARG TI_VERSION_MINOR
+ARG TI_VERSION_PATCH
+
+ENV PROJECT_NAME=${PROJECT_NAME}
+ENV RELEASE_VERSION=${RELEASE_VERSION}
+ENV TI_VERSION_MAJOR=${TI_VERSION_MAJOR}
+ENV TI_VERSION_MINOR=${TI_VERSION_MINOR}
+ENV TI_VERSION_PATCH=${TI_VERSION_PATCH}
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SRC_DIR=/src
+ENV TAICHI_SRC=${SRC_DIR}/taichi
+ENV LLVM_DIR=/usr/lib/llvm-${LLVM_VERSION}
+ENV PATH=${LLVM_DIR}/bin:$PATH
+ENV TAICHI_CMAKE_ARGS="-DTI_WITH_VULKAN=OFF -DTI_WITH_OPENGL=OFF -DTI_BUILD_TESTS=ON -DTI_BUILD_EXAMPLES=OFF -DCMAKE_PREFIX_PATH=${LLVM_DIR}/lib/cmake -DCMAKE_CXX_COMPILER=${LLVM_DIR}/bin/clang++ -DTI_WITH_AMDGPU=ON -DTI_WITH_CUDA=OFF -DTI_AMDGPU_ARCHS=${GPU_TARGETS}"
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git wget \
+    freeglut3-dev libglfw3-dev libglm-dev libglu1-mesa-dev \
+    libjpeg-dev liblz4-dev libpng-dev libssl-dev \
+    libwayland-dev libx11-xcb-dev libxcb-dri3-dev libxcb-ewmh-dev \
+    libxcb-keysyms1-dev libxcb-randr0-dev libxcursor-dev libxi-dev \
+    libxinerama-dev libxrandr-dev libzstd-dev \
+    python3-pip cmake pybind11-dev ca-certificates \
+    llvm-${LLVM_VERSION} clang-${LLVM_VERSION} lld-${LLVM_VERSION} \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy source code
+COPY . ${SRC_DIR}
+RUN git config --global --add safe.directory "${TAICHI_SRC}"
+
+# Build Taichi and generate artifacts
+RUN cd ${TAICHI_SRC} && \
+    ./build.py && \
+    mkdir -p /tmp/artifacts && \
+    cp dist/amd_taichi*.whl /tmp/artifacts/ && \
+    tar -czvf /tmp/artifacts/taichi-tests.tar.gz -C /src taichi
+
+# ---------------------------------------------
+# Stage 2: Create runtime image with Taichi installed
+# ---------------------------------------------
+FROM ${BASE_IMAGE} as taichi_final
+
+ARG LLVM_VERSION=15
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LLVM_DIR=/usr/lib/llvm-${LLVM_VERSION}
+ENV PATH=${LLVM_DIR}/bin:$PATH
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip lld-${LLVM_VERSION} && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Taichi wheel
+COPY --from=taichi_build /tmp/artifacts/amd_taichi*.whl /
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip3 install /amd_taichi*.whl && \
+    rm /amd_taichi*.whl
+
+# ---------------------------------------------
+# Stage 3: Export raw artifacts to host
+# ---------------------------------------------
+FROM scratch as taichi_export
+COPY --from=taichi_build /tmp/artifacts/ .

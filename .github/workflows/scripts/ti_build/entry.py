@@ -33,7 +33,7 @@ def build_wheel(python: Command, pip: Command) -> None:
     Build the Taichi wheel
     """
 
-    git.fetch("origin", "master", "--tags", "--force")
+    #git.fetch("origin", "master", "--tags", "--force")
     proj_tags = []
     extra = []
 
