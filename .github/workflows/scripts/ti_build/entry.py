@@ -33,7 +33,7 @@ def build_wheel(python: Command, pip: Command) -> None:
     Build the Taichi wheel
     """
 
-    #git.fetch("origin", "master", "--tags", "--force")
+    git.fetch("origin", "master", "--tags", "--force")
     proj_tags = []
     extra = []
 
@@ -52,11 +52,20 @@ def build_wheel(python: Command, pip: Command) -> None:
     elif wheel_tag:
         proj_tags.extend(["egg_info", f"--tag-build={wheel_tag}"])
 
-    if platform.system() == "Linux":
+    u = platform.uname()
+    if (u.system, u.machine) == ("Linux", "x86_64"):
         if is_manylinux2014():
             extra.extend(["-p", "manylinux2014_x86_64"])
         else:
             extra.extend(["-p", "manylinux_2_27_x86_64"])
+    elif (u.system, u.machine) in (("Linux", "arm64"), ("Linux", "aarch64")):
+        if is_manylinux2014():
+            extra.extend(["-p", "manylinux2014_aarch64"])
+        else:
+            extra.extend(["-p", "manylinux_2_27_aarch64"])
+    else:
+        extra.extend(["-p", "manylinux2014_x86_64"])
+
 
     python("setup.py", "clean")
     python("misc/make_changelog.py", "--ver", "origin/master", "--repo_dir", "./", "--save")
@@ -82,8 +91,8 @@ def setup_basic_build_env():
         setup_clang()
 
     setup_llvm()
-    if u.system in ("Linux", "Windows"):
-        # We support & test Vulkan shader debug printf on Linux && Windows
+    if u.system == "Linux":
+        # We support & test Vulkan shader debug printf on Linux
         # This is done through the validation layer
         from .vulkan import setup_vulkan
 
