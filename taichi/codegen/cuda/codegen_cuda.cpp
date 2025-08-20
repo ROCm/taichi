@@ -17,6 +17,7 @@
 #include "taichi/ir/analysis.h"
 #include "taichi/ir/transforms.h"
 #include "taichi/codegen/codegen_utils.h"
+#include "llvm/Config/llvm-config.h"
 
 namespace taichi::lang {
 
@@ -65,19 +66,17 @@ class TaskCodeGenCUDA : public TaskCodeGenLLVM {
                             const std::vector<llvm::Value *> &values) {
     auto stype = llvm::StructType::get(*llvm_context, types, false);
     auto value_arr = builder->CreateAlloca(stype);
+
     for (int i = 0; i < values.size(); i++) {
       auto value_ptr = builder->CreateGEP(
           stype, value_arr, {tlctx->get_constant(0), tlctx->get_constant(i)});
       builder->CreateStore(values[i], value_ptr);
     }
-    // === CHANGED SECTION: LLVM API CALL ===
-    // The call to `llvm::Type::getInt8PtrTy(*llvm_context)` was replaced with
-    // the modern `llvm::Type::getPointerTy()`, which returns an opaque pointer.
     return LLVMModuleBuilder::call(
         builder.get(), "vprintf",
         builder->CreateGlobalStringPtr(format, "format_string"),
-        builder->CreateBitCast(value_arr, llvm::PointerType::get(*llvm_context, 0)));
-    // === END OF CHANGED SECTION ===
+        builder->CreateBitCast(value_arr,
+                               llvm::PointerType::get(*llvm_context, 0)));
   }
 
   std::tuple<llvm::Value *, llvm::Type *> create_value_and_type(
@@ -344,6 +343,8 @@ class TaskCodeGenCUDA : public TaskCodeGenLLVM {
     UNARY_STD(sgn)
     UNARY_STD(acos)
     UNARY_STD(asin)
+    UNARY_STD(erf)
+    UNARY_STD(erfc)
     else {
       TI_P(unary_op_type_name(op));
       TI_NOT_IMPLEMENTED
@@ -414,8 +415,23 @@ class TaskCodeGenCUDA : public TaskCodeGenLLVM {
         !cuda_library_path.empty()) {
       /*
         Half2 optimization for float16 atomic add
-        ...
+
+        [CHI IR]
+            TensorType<2 x f16> old_val = atomic_add(TensorType<2 x f16>
+        dest_ptr*, TensorType<2 x f16> val)
+
+        [CodeGen]
+            old_val_ptr = Alloca(TensorType<2 x f16>)
+
+            val_ptr = Alloca(TensorType<2 x f16>)
+            GEP(val_ptr, 0) = ExtractValue(val, 0)
+            GEP(val_ptr, 1) = ExtractValue(val, 1)
+
+            half2_atomic_add(dest_ptr, old_val_ptr, val_ptr)
+
+            old_val = Load(old_val_ptr)
       */
+      // Allocate old_val_ptr to store the result of atomic_add
       auto char_type = llvm::Type::getInt8Ty(*tlctx->get_this_thread_context());
       auto half_type = llvm::Type::getHalfTy(*tlctx->get_this_thread_context());
       auto ptr_type = llvm::PointerType::get(char_type, 0);
@@ -591,30 +607,23 @@ class TaskCodeGenCUDA : public TaskCodeGenLLVM {
     return true;  // on CUDA, pass the argument by value
   }
 
-  // === CHANGED SECTION: LLVM API CALL ===
-  llvm::Value *create_intrinsic_load(llvm::Value *ptr,
-                                     llvm::Type *ty) override {
-    // Issue an "__ldg" instruction to cache data in the read-only data cache.
-    // The `nvvm_ldg_global_*` intrinsics have been renamed to `nvvm_ldu_global_*`
-    // (load uniform).
-    auto intrin = ty->isFloatingPointTy() ? llvm::Intrinsic::nvvm_ldu_global_f
-                                          : llvm::Intrinsic::nvvm_ldu_global_i;
-    // Special treatment for bool types. As nvvm_ldg_global_i does not support
-    // 1-bit integer, so we convert them to i8.
-    if (ty->getScalarSizeInBits() == 1) {
-      auto *new_ty = tlctx->get_data_type<uint8>();
-      auto *new_ptr =
-          builder->CreatePointerCast(ptr, llvm::PointerType::get(new_ty, 0));
-      auto *v = builder->CreateIntrinsic(
-          intrin, {new_ty, llvm::PointerType::get(new_ty, 0)},
-          {new_ptr, tlctx->get_constant(new_ty->getScalarSizeInBits())});
-      return builder->CreateIsNotNull(v);
+  llvm::Value *TaskCodeGenCUDA::create_intrinsic_load(llvm::Value *ptr,
+                                                    llvm::Type *ty) {
+  #if LLVM_VERSION_MAJOR >= 20
+      // ldg intrinsics removed – use normal load from AS(1) + invariant metadata
+      auto *load = builder->CreateLoad(ty, ptr);          // ld.global.ca
+      load->setMetadata(llvm::LLVMContext::MD_invariant_load,
+                        llvm::MDNode::get(*llvm_context, {}));
+      return load;
+  #else
+      auto intrin = ty->isFloatingPointTy()
+                        ? llvm::Intrinsic::nvvm_ldg_global_f
+                        : llvm::Intrinsic::nvvm_ldg_global_i;
+      return builder->CreateIntrinsic(intrin,
+              {ty, llvm::PointerType::get(ty, 0)},
+              {ptr, tlctx->get_constant(ty->getScalarSizeInBits())});
+  #endif
     }
-    return builder->CreateIntrinsic(
-        intrin, {ty, llvm::PointerType::get(ty, 0)},
-        {ptr, tlctx->get_constant(ty->getScalarSizeInBits())});
-  }
-  // === END OF CHANGED SECTION ===
 
   void visit(GlobalLoadStmt *stmt) override {
     if (auto get_ch = stmt->src->cast<GetChStmt>()) {
