@@ -5,6 +5,7 @@
 
 #ifdef TI_WITH_LLVM
 #include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
 #include "taichi/analysis/offline_cache_util.h"
@@ -18,6 +19,17 @@
 #include "taichi/codegen/codegen_utils.h"
 
 namespace taichi::lang {
+
+namespace {
+// Marks Taichi root-buffer / global allocations for LLVM AMDGPU so the backend
+// can emit native global atomics; see AMDGPUUsage.rst.
+void attach_amdgpu_global_atomic_metadata(llvm::AtomicRMWInst *rmw) {
+  rmw->setMetadata("amdgpu.no.fine.grained.memory",
+                   llvm::MDNode::get(rmw->getContext(), {}));
+  rmw->setMetadata("amdgpu.no.remote.memory",
+                   llvm::MDNode::get(rmw->getContext(), {}));
+}
+}  // namespace
 
 // TODO: sort function definitions to match declaration order in header
 
@@ -1453,9 +1465,12 @@ llvm::Value *TaskCodeGenLLVM::integral_type_atomic(AtomicOpStmt *stmt) {
   bin_op[AtomicOpType::bit_or] = llvm::AtomicRMWInst::BinOp::Or;
   bin_op[AtomicOpType::bit_xor] = llvm::AtomicRMWInst::BinOp::Xor;
   TI_ASSERT(bin_op.find(stmt->op_type) != bin_op.end());
-  return builder->CreateAtomicRMW(
+  llvm::AtomicRMWInst *rmw = builder->CreateAtomicRMW(
       bin_op.at(stmt->op_type), llvm_val[stmt->dest], llvm_val[stmt->val],
       llvm::MaybeAlign(0), llvm::AtomicOrdering::SequentiallyConsistent);
+  if (compile_config.arch == Arch::amdgpu)
+    attach_amdgpu_global_atomic_metadata(rmw);
+  return rmw;
 }
 
 llvm::Value *TaskCodeGenLLVM::atomic_op_using_cas(
@@ -1526,10 +1541,14 @@ llvm::Value *TaskCodeGenLLVM::real_type_atomic(AtomicOpStmt *stmt) {
   }
 
   switch (op) {
-    case AtomicOpType::add:
-      return builder->CreateAtomicRMW(
+    case AtomicOpType::add: {
+      llvm::AtomicRMWInst *rmw = builder->CreateAtomicRMW(
           llvm::AtomicRMWInst::FAdd, llvm_val[stmt->dest], llvm_val[stmt->val],
           llvm::MaybeAlign(0), llvm::AtomicOrdering::SequentiallyConsistent);
+      if (compile_config.arch == Arch::amdgpu)
+        attach_amdgpu_global_atomic_metadata(rmw);
+      return rmw;
+    }
     case AtomicOpType::mul:
       return atomic_op_using_cas(
           llvm_val[stmt->dest], llvm_val[stmt->val],

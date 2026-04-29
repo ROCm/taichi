@@ -16,6 +16,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsNVPTX.h"
+#include "llvm/IR/Metadata.h"
 #ifdef TI_WITH_AMDGPU
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #endif  // TI_WITH_AMDGPU
@@ -388,9 +389,19 @@ std::unique_ptr<llvm::Module> TaichiLLVMContext::module_from_file(
       std::vector<llvm::Value *> args;
       for (auto &arg : func->args())
         args.push_back(&arg);
-      builder.CreateRet(builder.CreateAtomicRMW(
+      llvm::AtomicRMWInst *rmw = builder.CreateAtomicRMW(
           op, args[0], args[1], llvm::MaybeAlign(0),
-          llvm::AtomicOrdering::SequentiallyConsistent));
+          llvm::AtomicOrdering::SequentiallyConsistent);
+      // LLVM AMDGPUUsage.rst: marks device-local coarse-grained memory so the
+      // backend can select native global atomics instead of always expanding
+      // to CAS (esp. for FP atomics). CUDA ignores unknown metadata.
+      if (arch_ == Arch::amdgpu) {
+        rmw->setMetadata("amdgpu.no.fine.grained.memory",
+                         llvm::MDNode::get(*ctx, {}));
+        rmw->setMetadata("amdgpu.no.remote.memory",
+                         llvm::MDNode::get(*ctx, {}));
+      }
+      builder.CreateRet(rmw);
       TaichiLLVMContext::mark_inline(func);
     };
 
