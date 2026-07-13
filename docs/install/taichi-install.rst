@@ -11,7 +11,7 @@ Taichi Lang on ROCm installation
 System requirements
 ====================================================================
 
-To use Taichi Lang `1.8.0b2 <https://github.com/ROCm/taichi/tree/release/1.8.0b2>`__, you need the following prerequisites:
+To use Taichi Lang `1.8.0b2 <https://github.com/AMD-Ecosystem/taichi/tree/release/1.8.0b2>`__, you need the following prerequisites:
 
 - **ROCm version:** `7.0.0 <https://repo.radeon.com/rocm/apt/7.0/>`__ (recommended)
 - **Operating system:** Ubuntu 22.04, 24.04
@@ -219,12 +219,12 @@ If you prefer to use the ROCm Ubuntu image, or already have a ROCm Ubuntu contai
          lsb-release software-properties-common gnupg \
          && ./llvm.sh ${LLVM_VERSION} llvm clang lld
 
-5. Clone the `https://github.com/ROCm/taichi <https://github.com/ROCm/taichi>`_ repository with the desired branch:
+5. Clone the `https://github.com/AMD-Ecosystem/taichi <https://github.com/AMD-Ecosystem/taichi>`_ repository with the desired branch:
 
    .. code-block:: bash
       
       cd /taichi_dir
-      git clone --recursive https://github.com/ROCm/taichi -b release/v1.8.0b2
+      git clone --recursive https://github.com/AMD-Ecosystem/taichi -b release/v1.8.0b2
       cd taichi
 
 6. Build the Taichi Lang wheel:
@@ -252,13 +252,13 @@ If you prefer to use the ROCm Ubuntu image, or already have a ROCm Ubuntu contai
 Test the Taichi Lang installation
 ================================================================================
 
-Clone the `https://github.com/ROCm/taichi <https://github.com/ROCm/taichi>`_ repository:
+Clone the `https://github.com/AMD-Ecosystem/taichi <https://github.com/AMD-Ecosystem/taichi>`_ repository:
 
 .. code-block:: bash
 
    sudo apt-get update
    sudo apt-get install -y git
-   git clone --recursive https://github.com/ROCm/taichi -b amd-release/v1.8.0b2
+   git clone --recursive https://github.com/AMD-Ecosystem/taichi -b amd-release/v1.8.0b2
 
 To test the Taichi Lang installation, run the ``laplace`` example in the source code: 
 
