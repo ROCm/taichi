@@ -10,7 +10,7 @@ Taichi Lang documentation
 
 `Taichi Lang <https://www.taichi-lang.org/>`_ is an open-source, imperative, and parallel 
 programming language designed for high-performance numerical computation. Taichi Lang is 
-part of the AMD ROCm™ Simulation Domain toolkit (ROCm-Simulation). Embedded in Python,
+part of the AMD Simulation toolkit. Embedded in Python,
 it leverages just-in-time (JIT) compilation frameworks such as LLVM to accelerate 
 compute-intensive Python code by compiling it to native GPU or CPU instructions.
 
@@ -18,7 +18,7 @@ Taichi Lang is widely used across various domains, such as real-time physical si
 numerical computing, augmented reality, artificial intelligence, computer vision, robotics, 
 visual effects for film and gaming, and general-purpose computing.
 
-The Taichi Lang public repository is located at `https://github.com/ROCm/taichi <https://github.com/ROCm/taichi>`__.
+The Taichi Lang public repository is located at `https://github.com/AMD-Ecosystem/taichi <https://github.com/AMD-Ecosystem/taichi>`__.
 
 .. grid:: 2
   :gutter: 3
