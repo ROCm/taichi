@@ -8,7 +8,7 @@
 Run a Taichi Lang example
 ********************************************************************
 
-Several examples are available in the `https://github.com/ROCm/taichi_examples <https://github.com/ROCm/taichi_examples>`__
+Several examples are available in the `https://github.com/AMD-Ecosystem/taichi_examples <https://github.com/AMD-Ecosystem/taichi_examples>`__
 repository, which includes a Dockerfile for building a container to install Taichi and a ``README.md`` file
 with instructions for building and running the examples.
 
@@ -16,7 +16,7 @@ with instructions for building and running the examples.
 
 .. code-block:: bash
 
-   git clone https://github.com/ROCm/taichi_examples.git
+   git clone https://github.com/AMD-Ecosystem/taichi_examples.git
 
 2. If you have Taichi installed in your environment, you do not need to build an additional container. Simply install the example dependencies:
 
@@ -215,8 +215,8 @@ Use cases and recommendations
   of Taichi Lang in enabling complex simulations and numerical algorithms, making 
   it ideal for developers working on compute-intensive tasks. Developers are 
   encouraged to follow recommended coding patterns and utilize Taichi Lang decorators 
-  for performance optimization, with examples available in the `https://github.com/ROCm/taichi_examples 
-  <https://github.com/ROCm/taichi_examples>`__ repository. Prebuilt Docker images 
+  for performance optimization, with examples available in the `https://github.com/AMD-Ecosystem/taichi_examples 
+  <https://github.com/AMD-Ecosystem/taichi_examples>`__ repository. Prebuilt Docker images 
   integrating ROCm, PyTorch, and Taichi are provided for simplified installation 
   and deployment, making it easier to leverage Taichi Lang for advanced computational workloads.
 
